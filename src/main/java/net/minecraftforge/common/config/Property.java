@@ -46,6 +46,8 @@ public class Property
     private String value;
     private String defaultValue;
     public String comment;
+    /** Contains a string detailing range and default value */
+    public String extraInfo;
     private String[] values;
     private String[] defaultValues;
     private String[] validValues;

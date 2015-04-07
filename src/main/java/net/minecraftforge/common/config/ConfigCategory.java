@@ -298,6 +298,10 @@ public class ConfigCategory implements Map<String, Property>
                 {
                     write(out, pad1, "# ", commentLine);
                 }
+                if (prop.extraInfo != null)
+                {
+                    write(out, pad1, "# ", prop.extraInfo);
+                }
             }
 
             String propName = prop.getName();

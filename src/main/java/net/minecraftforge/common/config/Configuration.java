@@ -113,7 +113,7 @@ public class Configuration
                 File fileBak = new File(file.getAbsolutePath() + "_" + 
                         new SimpleDateFormat("yyyyMMdd_HHmmss").format(new Date()) + ".errored");
                 FMLLog.severe("An exception occurred while loading config file %s. This file will be renamed to %s " +
-                		"and a new config file will be generated.", file.getName(), fileBak.getName());
+                        "and a new config file will be generated.", file.getName(), fileBak.getName());
                 e.printStackTrace();
                 
                 file.renameTo(fileBak);
@@ -1515,7 +1515,7 @@ public class Configuration
         Property prop = this.get(category, name, defaultValue);
         prop.setLanguageKey(langKey);
         prop.setValidationPattern(pattern);
-        prop.comment = comment + " [default: " + defaultValue + "]";
+        prop.extraInfo = "[default: " + defaultValue + "]";
         return prop.getString();
     }
     
@@ -1550,7 +1550,7 @@ public class Configuration
         Property prop = this.get(category, name, defaultValue);
         prop.setValidValues(validValues);
         prop.setLanguageKey(langKey);
-        prop.comment = comment + " [default: " + defaultValue + "]";
+        prop.extraInfo = "[default: " + defaultValue + "]";
         return prop.getString();
     }
     
@@ -1596,7 +1596,7 @@ public class Configuration
         Property prop = this.get(category, name, defaultValue);
         prop.setLanguageKey(langKey);
         prop.setValidValues(validValues);
-        prop.comment = comment + " [default: " + prop.getDefault() + "]";
+        prop.extraInfo = "[default: " + prop.getDefault() + "]";
         return prop.getStringList();
     }
     
@@ -1628,7 +1628,7 @@ public class Configuration
     {
         Property prop = this.get(category, name, defaultValue);
         prop.setLanguageKey(langKey);
-        prop.comment = comment + " [default: " + defaultValue + "]";
+        prop.extraInfo = "[default: " + defaultValue + "]";
         return prop.getBoolean(defaultValue);
     }
     
@@ -1664,7 +1664,7 @@ public class Configuration
     {
         Property prop = this.get(category, name, defaultValue);
         prop.setLanguageKey(langKey);
-        prop.comment = comment + " [range: " + minValue + " ~ " + maxValue + ", default: " + defaultValue + "]";
+        prop.extraInfo = "[range: " + minValue + " ~ " + maxValue + ", default: " + defaultValue + "]";
         prop.setMinValue(minValue);
         prop.setMaxValue(maxValue);
         return prop.getInt(defaultValue) < minValue ? minValue : (prop.getInt(defaultValue) > maxValue ? maxValue : prop.getInt(defaultValue));
@@ -1702,7 +1702,7 @@ public class Configuration
     {
         Property prop = this.get(category, name, Float.toString(defaultValue), name);
         prop.setLanguageKey(langKey);
-        prop.comment = comment + " [range: " + minValue + " ~ " + maxValue + ", default: " + defaultValue + "]";
+        prop.extraInfo = "[range: " + minValue + " ~ " + maxValue + ", default: " + defaultValue + "]";
         prop.setMinValue(minValue);
         prop.setMaxValue(maxValue);
         try
