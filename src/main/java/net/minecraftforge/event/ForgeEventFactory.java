@@ -26,6 +26,8 @@ import java.util.Map;
 import java.util.Random;
 
 import com.google.common.base.Predicate;
+import com.google.common.collect.Maps;
+
 import net.minecraft.block.state.IBlockState;
 import net.minecraft.command.ICommandSender;
 import net.minecraft.entity.Entity;
@@ -71,6 +73,7 @@ import net.minecraftforge.client.event.ClientChatReceivedEvent;
 import net.minecraftforge.client.event.RenderBlockOverlayEvent;
 import net.minecraftforge.client.event.RenderBlockOverlayEvent.OverlayType;
 import net.minecraftforge.common.MinecraftForge;
+import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.capabilities.CapabilityDispatcher;
 import net.minecraftforge.common.capabilities.ICapabilityProvider;
 import net.minecraftforge.common.util.BlockSnapshot;
@@ -117,6 +120,9 @@ import net.minecraftforge.event.world.WorldEvent;
 import net.minecraftforge.fml.common.ObfuscationReflectionHelper;
 import net.minecraftforge.fml.common.eventhandler.Event;
 import net.minecraftforge.fml.common.eventhandler.Event.Result;
+import net.minecraftforge.oredict.CapabilityItemAspects;
+import net.minecraftforge.oredict.IItemAspects;
+import net.minecraftforge.oredict.ItemAspects;
 
 import javax.annotation.Nonnull;
 import javax.annotation.Nullable;
@@ -593,7 +599,33 @@ public class ForgeEventFactory
 
         // fire new event with the caps that were already registered on the legacy event
         AttachCapabilitiesEvent<ItemStack> event = new AttachCapabilitiesEvent<ItemStack>(ItemStack.class, stack, legacyEvent.caps);
-        return gatherCapabilities(event, parent);
+        CapabilityDispatcher ret = gatherCapabilities(event, parent);
+        
+        // Add empty item aspects if none exist
+        if (ret == null || !ret.hasCapability(CapabilityItemAspects.ITEM_ASPECTS_CAPABILITY, null))
+        {
+        	ICapabilityProvider aspectProvider = new ICapabilityProvider()
+    		{    			
+    			@Override
+    			public boolean hasCapability(Capability<?> capability, EnumFacing facing)
+    			{
+    				return capability == CapabilityItemAspects.ITEM_ASPECTS_CAPABILITY;
+    			}
+    			
+    			@Override
+    			public <T> T getCapability(Capability<T> capability, EnumFacing facing)
+    			{
+                    return capability == CapabilityItemAspects.ITEM_ASPECTS_CAPABILITY ? CapabilityItemAspects.ITEM_ASPECTS_CAPABILITY.cast(ItemAspects.EMPTY) : null;
+    			}
+    		};
+    		
+        	// add item aspects cap
+    		Map<ResourceLocation, ICapabilityProvider> map = Maps.newLinkedHashMap();
+    		map.put(new ResourceLocation("forge:itemaspects"), aspectProvider);
+    		ret = new CapabilityDispatcher(map, ret);
+        }
+
+        return ret;
     }
 
     @Nullable
