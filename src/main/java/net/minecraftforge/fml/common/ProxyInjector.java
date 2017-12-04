@@ -23,8 +23,10 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
 import java.util.Set;
 
+import net.minecraftforge.fml.common.SidedProxy.ProxyClass;
 import net.minecraftforge.fml.common.discovery.ASMDataTable;
 import net.minecraftforge.fml.common.discovery.ASMDataTable.ASMData;
+import net.minecraftforge.fml.common.discovery.asm.ModAnnotation.EnumHolder;
 import net.minecraftforge.fml.relauncher.Side;
 
 import org.apache.logging.log4j.Level;
@@ -44,6 +46,7 @@ public class ProxyInjector
         SetMultimap<String, ASMData> modData = data.getAnnotationsFor(mod);
         Set<ASMData> mods = modData.get(Mod.class.getName());
         Set<ASMData> targets = modData.get(SidedProxy.class.getName());
+        Set<ASMData> impls = modData.get(ProxyClass.class.getName());
         ClassLoader mcl = Loader.instance().getModClassLoader();
 
         for (ASMData targ : targets)
@@ -80,7 +83,12 @@ public class ProxyInjector
                 String targetType = side.isClient() ? annotation.clientSide() : annotation.serverSide();
                 if(targetType.equals(""))
                 {
-                    targetType = targ.getClassName() + (side.isClient() ? "$ClientProxy" : "$ServerProxy");
+                    targetType = impls.stream()
+                    		.filter(a -> a.getAnnotationInfo().get("modId").equals(mod.getModId()))
+                    		.filter(a -> ((EnumHolder) a.getAnnotationInfo().get("side")).getValue().equals(side.toString()))
+                    		.findFirst()
+                    		.map(ASMData::getClassName)
+                    		.orElse(targ.getClassName() + (side.isClient() ? "$ClientProxy" : "$ServerProxy"));
                 }
                 Object proxy=Class.forName(targetType, true, mcl).newInstance();
 

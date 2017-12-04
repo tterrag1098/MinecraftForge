@@ -23,6 +23,7 @@ import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
 import java.lang.annotation.RetentionPolicy;
 import java.lang.annotation.Target;
+import net.minecraftforge.fml.relauncher.Side;
 
 /**
  * Sided proxies are loaded based on the specific environment they find themselves loaded into.
@@ -34,20 +35,21 @@ import java.lang.annotation.Target;
  * <p>
  * This example will load a CommonProxy on the server side, and a ClientProxy on the client side.
  *
- * <pre>{@code
+ * <pre>
  *  public class MySidedProxyHolder {
- *      {@literal @}SidedProxy(modId="MyModId",clientSide="mymod.ClientProxy", serverSide="mymod.CommonProxy")
+ *      {@literal @}SidedProxy(modId="mymodid")
  *      public static CommonProxy proxy;
  *  }
  *
+ *  {@literal @}ProxyClass(modId = "mymodid", side = Side.SERVER)
  *  public class CommonProxy {
  *      // Common or server stuff here that needs to be overridden on the client
  *  }
- *
+ *  
+ *  {@literal @}ProxyClass(modId = "mymodid", side = Side.CLIENT)
  *  public class ClientProxy extends CommonProxy {
  *      // Override common stuff with client specific stuff here
  *  }
- * }
  * </pre>
  * @author cpw
  *
@@ -59,13 +61,19 @@ public @interface SidedProxy
     /**
      * The full name of the client side class to load and populate.
      * Defaults to the nested class named "ClientProxy" in the current class.
+     * 
+     * @deprecated Use {@link ProxyClass}
      */
+    @Deprecated
     String clientSide() default "";
 
     /**
      * The full name of the server side class to load and populate.
      * Defaults to the nested class named "ServerProxy" in the current class.
+     * 
+     * @deprecated Use {@link ProxyClass}
      */
+    @Deprecated
     String serverSide() default "";
 
     /**
@@ -73,4 +81,20 @@ public @interface SidedProxy
      * Or there is no other way to determine the mod this annotation belongs to. When in doubt, add this value.
      */
     String modId() default "";
+
+    /**
+     * Use this to define your client and server proxy implementations.
+     * <p>
+     * {@code @ProxyClass(modId = "mymod", side = Side.CLIENT)}<br>
+     * or<br>
+     * {@code @ProxyClass(modId = "mymod", side = Side.SERVER)}
+     */
+    @Retention(RetentionPolicy.RUNTIME)
+    @Target(ElementType.TYPE)
+    public @interface ProxyClass {
+
+        String modId();
+
+        Side side();
+    }
 }
