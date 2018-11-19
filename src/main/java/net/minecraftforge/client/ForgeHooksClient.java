@@ -638,7 +638,7 @@ public class ForgeHooksClient
     
     private static final LightGatheringTransformer lightGatherer = new LightGatheringTransformer();
 
-    public static void renderLitItem(RenderItem renderer, IBakedModel model, int color, ItemStack stack)
+    public static void renderLitItem(RenderItem ri, IBakedModel model, int color, ItemStack stack)
     {
         List<BakedQuad> allquads = new ArrayList<>();
 
@@ -667,29 +667,29 @@ public class ForgeHooksClient
 
         for (int i = 0; i < allquads.size(); i++) 
         {
-            BakedQuad quad = allquads.get(i);
+            BakedQuad q = allquads.get(i);
 
             // Lighting of the current quad
-            int blockLight = 0;
-            int skyLight = 0;
+            int bl = 0;
+            int sl = 0;
 
             // Fail-fast on ITEM, as it cannot have light data
-            if (quad.getFormat() != DefaultVertexFormats.ITEM && quad.getFormat().hasUvOffset(1))
+            if (q.getFormat() != DefaultVertexFormats.ITEM && q.getFormat().hasUvOffset(1))
             {
-                quad.pipe(lightGatherer);
+                q.pipe(lightGatherer);
                 if (lightGatherer.hasLighting())
                 {
-                    blockLight = lightGatherer.blockLight;
-                    skyLight = lightGatherer.skyLight;
+                    bl = lightGatherer.blockLight;
+                    sl = lightGatherer.skyLight;
                 }
             }
 
             int colorMultiplier = segmentColorMultiplier;
 
             // If there is no color override, and this quad is tinted, we need to apply IItemColor
-            if (color == 0xFFFFFFFF && quad.hasTintIndex())
+            if (color == 0xFFFFFFFF && q.hasTintIndex())
             {
-                int tintIndex = quad.getTintIndex();
+                int tintIndex = q.getTintIndex();
 
                 if (prevTintIndex != tintIndex)
                 {
@@ -703,7 +703,7 @@ public class ForgeHooksClient
                 prevTintIndex = -1;
             }
 
-            boolean lightingDirty = segmentBlockLight != blockLight || segmentSkyLight != skyLight;
+            boolean lightingDirty = segmentBlockLight != bl || segmentSkyLight != sl;
             boolean colorDirty = hasLighting && segmentColorMultiplier != colorMultiplier;
 
             // If lighting or color data has changed, draw the segment and flush it
@@ -711,18 +711,18 @@ public class ForgeHooksClient
             {
                 if (i > 0) // Make sure this isn't the first quad being processed
                 {
-                    drawSegment(renderer, color, stack, segment, segmentBlockLight, segmentSkyLight, segmentColorMultiplier, lightingDirty && (hasLighting || segment.size() < i), colorDirty);
+                    drawSegment(ri, color, stack, segment, segmentBlockLight, segmentSkyLight, segmentColorMultiplier, lightingDirty && (hasLighting || segment.size() < i), colorDirty);
                 }
-                segmentBlockLight = blockLight;
-                segmentSkyLight = skyLight;
+                segmentBlockLight = bl;
+                segmentSkyLight = sl;
                 segmentColorMultiplier = colorMultiplier;
                 hasLighting = segmentBlockLight > 0 || segmentSkyLight > 0;
             }
 
-            segment.add(quad);
+            segment.add(q);
         }
 
-        drawSegment(renderer, color, stack, segment, segmentBlockLight, segmentSkyLight, segmentColorMultiplier, hasLighting || segment.size() < allquads.size(), false);
+        drawSegment(ri, color, stack, segment, segmentBlockLight, segmentSkyLight, segmentColorMultiplier, hasLighting || segment.size() < allquads.size(), false);
 
         // Clean up render state if necessary
         if (hasLighting)
@@ -732,7 +732,7 @@ public class ForgeHooksClient
         }
     }
 
-    private static void drawSegment(RenderItem renderer, int baseColor, ItemStack stack, List<BakedQuad> segment, int bl, int sl, int tintColor, boolean updateLighting, boolean updateColor)
+    private static void drawSegment(RenderItem ri, int baseColor, ItemStack stack, List<BakedQuad> segment, int bl, int sl, int tintColor, boolean updateLighting, boolean updateColor)
     {
         BufferBuilder bufferbuilder = Tessellator.getInstance().getBuffer();
         bufferbuilder.begin(GL11.GL_QUADS, DefaultVertexFormats.ITEM);
@@ -756,7 +756,7 @@ public class ForgeHooksClient
             }
         }
 
-        renderer.renderQuads(bufferbuilder, segment, baseColor, stack);
+        ri.renderQuads(bufferbuilder, segment, baseColor, stack);
         Tessellator.getInstance().draw();
 
         // Preserve this as it represents the "world" lighting
