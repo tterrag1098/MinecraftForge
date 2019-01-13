@@ -31,10 +31,13 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
+import java.util.ListIterator;
 import java.util.Map;
 import java.util.Objects;
+import java.util.function.Function;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
+import java.util.function.UnaryOperator;
 
 import com.electronwill.nightconfig.core.CommentedConfig;
 import com.electronwill.nightconfig.core.Config;
@@ -128,7 +131,7 @@ public class ForgeConfigSpec extends UnmodifiableConfigWrapper<Config>
                     if (dryRun)
                         return 1;
 
-                    Object newValue = valueSpec.getDefault();
+                    Object newValue = valueSpec.correct(configValue);
                     configMap.put(key, newValue);
                     listener.onCorrect(action, parentPathUnmodifiable, configValue, newValue);
                     count++;
@@ -165,203 +168,160 @@ public class ForgeConfigSpec extends UnmodifiableConfigWrapper<Config>
         }
         return count;
     }
-
-
+    
+    private static <T> Supplier<T> supply(T val) { return () -> val; }
+    
+    private static Predicate<Object> defaultValidator(Supplier<?> supplier) { 
+        return o -> o != null && supplier.get().getClass().isAssignableFrom(o.getClass());
+    }
 
     public static class Builder
     {
         private final Config storage = InMemoryFormat.withUniversalSupport().createConfig();
-        private BuilderContext context = new BuilderContext();
         private Map<List<String>, String> levelComments = new HashMap<>();
-        private List<String> currentPath = new ArrayList<>();
+        private LinkedList<String> currentPath = new LinkedList<>();
+        
+        Builder define(ValueBuilder<?> value) {
+            push(value.path);
+            storage.set(path(), new ValueSpec(value));
+            comment(value.comment);
+            pop(value.path.size());
+            return this;
+        }
 
         //Object
-        public Builder define(String path, Object defaultValue) {
-            return define(split(path), defaultValue);
+        public <T> ValueBuilder<T> value(String path, T defaultValue) {
+            return value(split(path), defaultValue);
         }
-        public Builder define(List<String> path, Object defaultValue) {
-            return define(path, defaultValue, o -> o != null && defaultValue.getClass().isAssignableFrom(o.getClass()));
+        @SuppressWarnings("unchecked")
+        public <T> ValueBuilder<T> value(List<String> path, T defaultValue) {
+            return value(path, supply(defaultValue), (Class<? extends T>) defaultValue.getClass());
         }
-        public Builder define(String path, Object defaultValue, Predicate<Object> validator) {
-            return define(split(path), defaultValue, validator);
+        public <T> ValueBuilder<T> value(List<String> path, Supplier<T> defaultSupplier, Class<? extends T> clazz) {
+            return new ValueBuilder<>(this, path, defaultSupplier, clazz);
         }
-        public Builder define(List<String> path, Object defaultValue, Predicate<Object> validator) {
-            Objects.requireNonNull(defaultValue, "Default value can not be null");
-            return define(path, () -> defaultValue, validator);
+
+        // Comparable (allows range)
+        @SuppressWarnings("unchecked")
+        public <V extends Comparable<? super V>> ComparableValueBuilder<V> comparableValue(String path, V defaultValue) {
+            return comparableValue(split(path), defaultValue, (Class<V>) defaultValue.getClass());
         }
-        public Builder define(String path, Supplier<?> defaultSupplier, Predicate<Object> validator) {
-            return define(split(path), defaultSupplier, validator);
+        public <V extends Comparable<? super V>> ComparableValueBuilder<V> comparableValue(String path, V defaultValue, Class<V> clazz) {
+            return comparableValue(split(path), defaultValue, clazz);
         }
-        public Builder define(List<String> path, Supplier<?> defaultSupplier, Predicate<Object> validator) {
-            return define(path, defaultSupplier, validator, Object.class);
+        public <V extends Comparable<? super V>> ComparableValueBuilder<V> comparableValue(List<String> path, V defaultValue, Class<V> clazz) {
+            return comparableValue(path, (Supplier<V>)() -> defaultValue, clazz);
         }
-        public Builder define(List<String> path, Supplier<?> defaultSupplier, Predicate<Object> validator, Class<?> clazz) { // This is the root where everything at the end of the day ends up.
-            if (!currentPath.isEmpty()) {
-                List<String> tmp = new ArrayList<>(currentPath.size() + path.size());
-                tmp.addAll(currentPath);
-                tmp.addAll(path);
-                path = tmp;
-            }
-            context.setClazz(clazz);
-            storage.set(path, new ValueSpec(defaultSupplier, validator, context));
-            context = new BuilderContext();
-            return this;
+        public <V extends Comparable<? super V>> ComparableValueBuilder<V> comparableValue(String path, Supplier<V> defaultSupplier, Class<V> clazz) {
+            return comparableValue(split(path), defaultSupplier, clazz);
         }
-        public <V extends Comparable<? super V>> Builder defineInRange(String path, V defaultValue, V min, V max, Class<V> clazz) {
-            return defineInRange(split(path), defaultValue, min, max, clazz);
+        public <V extends Comparable<? super V>> ComparableValueBuilder<V> comparableValue(List<String> path, Supplier<V> defaultSupplier, Class<V> clazz) {
+            return new ComparableValueBuilder<>(this, path, defaultSupplier, clazz);
         }
-        public <V extends Comparable<? super V>> Builder defineInRange(List<String> path,  V defaultValue, V min, V max, Class<V> clazz) {
-            return defineInRange(path, (Supplier<V>)() -> defaultValue, min, max, clazz);
+        
+        // Enumerated, validator is automatically created from given acceptable values
+        public <T> ValueBuilder<T> enumeratedValue(String path, T defaultValue, Collection<? extends T> acceptableValues) {
+            return enumeratedValue(split(path), defaultValue, acceptableValues);
         }
-        public <V extends Comparable<? super V>> Builder defineInRange(String path, Supplier<V> defaultSupplier, V min, V max, Class<V> clazz) {
-            return defineInRange(split(path), defaultSupplier, min, max, clazz);
+        public <T> ValueBuilder<T> enumeratedValue(String path, Supplier<T> defaultSupplier, Class<? extends T> clazz, Collection<? extends T> acceptableValues) {
+            return enumeratedValue(split(path), defaultSupplier, clazz, acceptableValues);
         }
-        public <V extends Comparable<? super V>> Builder defineInRange(List<String> path, Supplier<V> defaultSupplier, V min, V max, Class<V> clazz) {
-            Range<V> range = new Range<>(clazz, min, max);
-            context.setRange(range);
-            if (min.compareTo(max) > 0)
-                throw new IllegalArgumentException("Range min most be less then max.");
-            define(path, defaultSupplier, range);
-            return this;
+        @SuppressWarnings("unchecked")
+        public <T> ValueBuilder<T> enumeratedValue(List<String> path, T defaultValue, Collection<? extends T> acceptableValues) {
+            return enumeratedValue(path, supply(defaultValue), (Class<? extends T>) defaultValue.getClass(), acceptableValues);
         }
-        public Builder defineInList(String path, Object defaultValue, Collection<?> acceptableValues) {
-            return defineInList(split(path), defaultValue, acceptableValues);
+        public <T> ValueBuilder<T> enumeratedValue(List<String> path, Supplier<T> defaultSupplier, Class<? extends T> clazz, Collection<? extends T> acceptableValues) {
+            return value(path, defaultSupplier, clazz).validator(acceptableValues::contains);
         }
-        public Builder defineInList(String path, Supplier<?> defaultSupplier, Collection<?> acceptableValues) {
-            return defineInList(split(path), defaultSupplier, acceptableValues);
+        
+        // List special case, allows easy validation of list objects
+        public <T> ValueBuilder<List<? extends T>> listValue(String path, List<? extends T> defaultValue, Predicate<T> elementValidator) {
+            return listValue(split(path), defaultValue, elementValidator);
         }
-        public Builder defineInList(List<String> path, Object defaultValue, Collection<?> acceptableValues) {
-            return defineInList(path, () -> defaultValue, acceptableValues);
+        public <T> ValueBuilder<List<? extends T>> listValue(String path, Supplier<List<? extends T>> defaultSupplier, Predicate<T> elementValidator) {
+            return listValue(split(path), defaultSupplier, elementValidator);
         }
-        public Builder defineInList(List<String> path, Supplier<?> defaultSupplier, Collection<?> acceptableValues) {
-            return define(path, defaultSupplier, acceptableValues::contains);
+        public <T> ValueBuilder<List<? extends T>> listValue(List<String> path, List<? extends T> defaultValue, Predicate<T> elementValidator) {
+            return listValue(path, supply(defaultValue), elementValidator);
         }
-        public Builder defineList(String path, List<?> defaultValue, Predicate<Object> elementValidator) {
-            return defineList(split(path), defaultValue, elementValidator);
-        }
-        public Builder defineList(String path, Supplier<List<?>> defaultSupplier, Predicate<Object> elementValidator) {
-            return defineList(split(path), defaultSupplier, elementValidator);
-        }
-        public Builder defineList(List<String> path, List<?> defaultValue, Predicate<Object> elementValidator) {
-            return defineList(path, () -> defaultValue, elementValidator);
-        }
-        public Builder defineList(List<String> path, Supplier<List<?>> defaultSupplier, Predicate<Object> elementValidator) {
-            return define(path, defaultSupplier, (Object o) -> {
-                if (!(o instanceof List)) return false;
-                return ((List<?>)o).stream().allMatch(elementValidator);
+        @SuppressWarnings({ "unchecked", "rawtypes" })
+        public <T> ValueBuilder<List<? extends T>> listValue(List<String> path, Supplier<List<? extends T>> defaultSupplier, Predicate<T> elementValidator) {
+            return value(path, defaultSupplier, (Class<List<T>>) (Class) List.class).corrector(value -> {
+                if (value == null || !(value instanceof List) || ((List<?>)value).isEmpty()) {
+                    return defaultSupplier.get();
+                }
+                List<? extends T> list = Lists.newArrayList((List<? extends T>) value);
+                Iterator<? extends T> iter = list.iterator();
+                while (iter.hasNext()) {
+                    T ele = iter.next();
+                    if (!elementValidator.test(ele)) {
+                        iter.remove();
+                    }
+                }
+                if (list.isEmpty()) {
+                    return defaultSupplier.get();
+                }
+                return list;
             });
         }
 
-        //Enum
-        public <V extends Enum<V>> Builder defineEnum(String path, V defaultValue) {
-            return defineEnum(split(path), defaultValue);
+        // Enum, proxies to comparableValue
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(String path, V defaultValue) {
+            return enumValue(split(path), defaultValue);
         }
-        public <V extends Enum<V>> Builder defineEnum(List<String> path, V defaultValue) {
-            return defineEnum(path, defaultValue, defaultValue.getDeclaringClass().getEnumConstants());
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(List<String> path, V defaultValue) {
+            return enumValue(path, defaultValue, defaultValue.getDeclaringClass().getEnumConstants());
         }
-        public <V extends Enum<V>> Builder defineEnum(String path, V defaultValue, @SuppressWarnings("unchecked") V... acceptableValues) {
-            return defineEnum(split(path), defaultValue, acceptableValues);
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(String path, V defaultValue, @SuppressWarnings("unchecked") V... acceptableValues) {
+            return enumValue(split(path), defaultValue, acceptableValues);
         }
-        public <V extends Enum<V>> Builder defineEnum(List<String> path, V defaultValue, @SuppressWarnings("unchecked") V... acceptableValues) {
-            return defineEnum(path, defaultValue, Arrays.asList(acceptableValues));
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(List<String> path, V defaultValue, @SuppressWarnings("unchecked") V... acceptableValues) {
+            return enumValue(path, defaultValue, Arrays.asList(acceptableValues));
         }
-        public <V extends Enum<V>> Builder defineEnum(String path, V defaultValue, Collection<V> acceptableValues) {
-            return defineEnum(split(path), defaultValue, acceptableValues);
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(String path, V defaultValue, Collection<V> acceptableValues) {
+            return enumValue(split(path), defaultValue, acceptableValues);
         }
-        public <V extends Enum<V>> Builder defineEnum(List<String> path, V defaultValue, Collection<V> acceptableValues) {
-            return defineEnum(path, defaultValue, acceptableValues::contains);
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(List<String> path, V defaultValue, Collection<V> acceptableValues) {
+            return enumValue(path, defaultValue, acceptableValues::contains);
         }
-        public <V extends Enum<V>> Builder defineEnum(String path, V defaultValue, Predicate<Object> validator) {
-            return defineEnum(split(path), defaultValue, validator);
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(String path, V defaultValue, Predicate<Object> validator) {
+            return enumValue(split(path), defaultValue, validator);
         }
-        public <V extends Enum<V>> Builder defineEnum(List<String> path, V defaultValue, Predicate<Object> validator) {
-            return defineEnum(path, () -> defaultValue, validator, defaultValue.getDeclaringClass());
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(List<String> path, V defaultValue, Predicate<Object> validator) {
+            return enumValue(path, () -> defaultValue, validator, defaultValue.getDeclaringClass());
         }
-        public <V extends Enum<V>> Builder defineEnum(String path, Supplier<V> defaultSupplier, Predicate<Object> validator, Class<V> clazz) {
-            return defineEnum(split(path), defaultSupplier, validator, clazz);
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(String path, Supplier<V> defaultSupplier, Predicate<Object> validator, Class<V> clazz) {
+            return enumValue(split(path), defaultSupplier, validator, clazz);
         }
-        public <V extends Enum<V>> Builder defineEnum(List<String> path, Supplier<V> defaultSupplier, Predicate<Object> validator, Class<V> clazz) {
-            return define(path, defaultSupplier, validator, clazz);
+        public <V extends Enum<V>> ComparableValueBuilder<V> enumValue(List<String> path, Supplier<V> defaultSupplier, Predicate<Object> validator, Class<V> clazz) {
+            return (ComparableValueBuilder<V>) comparableValue(path, defaultSupplier, clazz).validator(validator);
         }
 
-
-        //boolean
-        public Builder define(String path, boolean defaultValue) {
-            return define(split(path), defaultValue);
+        // boolean special case, handle validation of string equivalents
+        public ValueBuilder<Boolean> value(String path, boolean defaultValue) {
+            return value(split(path), defaultValue);
         }
-        public Builder define(List<String> path, boolean defaultValue) {
-            return define(path, (Supplier<Boolean>)() -> defaultValue);
+        public ValueBuilder<Boolean> value(List<String> path, boolean defaultValue) {
+            return value(path, (Supplier<Boolean>)() -> defaultValue);
         }
-        public Builder define(String path, Supplier<Boolean> defaultSupplier) {
-            return define(split(path), defaultSupplier);
+        public ValueBuilder<Boolean> value(String path, Supplier<Boolean> defaultSupplier) {
+            return value(split(path), defaultSupplier);
         }
-        public Builder define(List<String> path, Supplier<Boolean> defaultSupplier) {
-            return define(path, defaultSupplier, o -> {
+        public ValueBuilder<Boolean> value(List<String> path, Supplier<Boolean> defaultSupplier) {
+            return value(path, defaultSupplier, Boolean.class).validator(o -> {
                 if (o instanceof String) return ((String)o).equalsIgnoreCase("true") || ((String)o).equalsIgnoreCase("false");
                 return o instanceof Boolean;
-            }, Boolean.class);
+            });
         }
-
-        //Double
-        public Builder defineInRange(String path, double defaultValue, double min, double max) {
-            return defineInRange(split(path), defaultValue, min, max);
+        
+        List<String> path() {
+            List<String> path = new ArrayList<String>(currentPath);
+            Collections.reverse(path); // Flip stack
+            return path;
         }
-        public Builder defineInRange(List<String> path, double defaultValue, double min, double max) {
-            return defineInRange(path, (Supplier<Double>)() -> defaultValue, min, max);
-        }
-        public Builder defineInRange(String path, Supplier<Double> defaultSupplier, double min, double max) {
-            return defineInRange(split(path), defaultSupplier, min, max);
-        }
-        public Builder defineInRange(List<String> path, Supplier<Double> defaultSupplier, double min, double max) {
-            return defineInRange(path, defaultSupplier, min, max, Double.class);
-        }
-        //Ints
-        public Builder defineInRange(String path, int defaultValue, int min, int max) {
-            return defineInRange(split(path), defaultValue, min, max);
-        }
-        public Builder defineInRange(List<String> path, int defaultValue, int min, int max) {
-            return defineInRange(path, (Supplier<Integer>)() -> defaultValue, min, max);
-        }
-        public Builder defineInRange(String path, Supplier<Integer> defaultSupplier, int min, int max) {
-            return defineInRange(split(path), defaultSupplier, min, max);
-        }
-        public Builder defineInRange(List<String> path, Supplier<Integer> defaultSupplier, int min, int max) {
-            return defineInRange(path, defaultSupplier, min, max, Integer.class);
-        }
-        //Longs
-        public Builder defineInRange(String path, long defaultValue, long min, long max) {
-            return defineInRange(split(path), defaultValue, min, max);
-        }
-        public Builder defineInRange(List<String> path, long defaultValue, long min, long max) {
-            return defineInRange(path, (Supplier<Long>)() -> defaultValue, min, max);
-        }
-        public Builder defineInRange(String path, Supplier<Long> defaultSupplier, long min, long max) {
-            return defineInRange(split(path), defaultSupplier, min, max);
-        }
-        public Builder defineInRange(List<String> path, Supplier<Long> defaultSupplier, long min, long max) {
-            return defineInRange(path, defaultSupplier, min, max, Long.class);
-        }
-
-        public Builder comment(String comment)
-        {
-            context.setComment(comment);
-            return this;
-        }
-        public Builder comment(String... comment)
-        {
-            context.setComment(comment);
-            return this;
-        }
-
-        public Builder translation(String translationKey)
-        {
-            context.setTranslationKey(translationKey);
-            return this;
-        }
-
-        public Builder worldRestart()
-        {
-            context.worldRestart();
+        
+        public Builder comment(String... comments) {
+            levelComments.put(path(), LINE_JOINER.join(comments));
             return this;
         }
 
@@ -370,13 +330,7 @@ public class ForgeConfigSpec extends UnmodifiableConfigWrapper<Config>
         }
 
         public Builder push(List<String> path) {
-            currentPath.addAll(path);
-            if (context.getComment() != null) {
-
-                levelComments.put(new ArrayList<String>(currentPath), LINE_JOINER.join(context.getComment()));
-                context.setComment((String[])null);
-            }
-            context.ensureEmpty();
+            path.forEach(currentPath::push);
             return this;
         }
 
@@ -388,58 +342,128 @@ public class ForgeConfigSpec extends UnmodifiableConfigWrapper<Config>
             if (count > currentPath.size())
                 throw new IllegalArgumentException("Attempted to pop " + count + " elements when we only had: " + currentPath);
             for (int x = 0; x < count; x++)
-                currentPath.remove(currentPath.size() - 1);
+                currentPath.pop();
             return this;
         }
 
         public ForgeConfigSpec build()
         {
-            context.ensureEmpty();
             return new ForgeConfigSpec(storage, levelComments);
         }
     }
-
-    private static class BuilderContext
+    
+    public static class ValueBuilder<T>
     {
-        private String[] comment;
-        private String langKey;
-        private Range<?> range;
-        private boolean worldRestart = false;
-        private Class<?> clazz;
-
-        public void setComment(String... value) { this.comment = value; }
-        public String[] getComment() { return this.comment; }
-        public void setTranslationKey(String value) { this.langKey = value; }
-        public String getTranslationKey() { return this.langKey; }
-        public <V extends Comparable<? super V>> void setRange(Range<V> value)
+        private final Builder parent;
+        final List<String> path;
+        private final Supplier<T> supplier;
+        final Class<? extends T> clazz;
+        
+        String[] comment = new String[0];
+        String langKey;
+        boolean worldRestart = false;
+        
+        Predicate<?> validator;
+        UnaryOperator<? super T> corrector;
+        
+        ValueBuilder(Builder parent, List<String> path, Supplier<T> defaultSupplier, Class<? extends T> clazz)
         {
-            this.range = value;
-            this.setClazz(value.getClazz());
+            this.parent = parent;
+            this.path = path;
+            this.supplier = defaultSupplier;
+            this.clazz = clazz;
+            this.validator = defaultValidator(defaultSupplier);
+            this.corrector = $ -> defaultSupplier.get();
         }
-        @SuppressWarnings("unchecked")
-        public <V extends Comparable<? super V>> Range<V> getRange() { return (Range<V>)this.range; }
-        public void worldRestart() { this.worldRestart = true; }
-        public boolean needsWorldRestart() { return this.worldRestart; }
-        public void setClazz(Class<?> clazz) { this.clazz = clazz; }
-        public Class<?> getClazz(){ return this.clazz; }
 
-        public void ensureEmpty()
+        public ValueBuilder<T> comment(String... comment)
+        {
+            this.comment = comment;
+            return this;
+        }
+
+        public ValueBuilder<T> translation(String translationKey)
+        {
+            this.langKey = translationKey;
+            return this;
+        }
+          
+        public ValueBuilder<T> worldRestart()
+        {
+            worldRestart = true;
+            return this;
+        }
+        
+        public ValueBuilder<T> validator(Predicate<?> validator)
+        {
+            this.validator = validator;
+            return this;
+        }
+        
+        public ValueBuilder<T> corrector(UnaryOperator<? super T> corrector)
+        {
+            this.corrector = corrector;
+            return this;
+        }
+        
+        public Builder define()
+        {
+            return this.parent.define(this);
+        }
+
+        void ensureEmpty()
         {
             validate(comment, "Non-null comment when null expected");
             validate(langKey, "Non-null translation key when null expected");
-            validate(range, "Non-null range when null expected");
             validate(worldRestart, "Dangeling world restart value set to true");
         }
+        
+        Range<? extends T> getRange()
+        {
+            return null;
+        }
 
-        private void validate(Object value, String message)
+        void validate(Object value, String message)
         {
             if (value != null)
                 throw new IllegalStateException(message);
         }
-        private void validate(boolean value, String message)
+        
+        void validate(boolean value, String message)
         {
             if (value)
                 throw new IllegalStateException(message);
+        }
+    }
+    
+    public static class ComparableValueBuilder<T extends Comparable<? super T>> extends ValueBuilder<T>
+    {  
+        private Range<T> range;
+
+        ComparableValueBuilder(Builder parent, List<String> path, Supplier<T> defaultSupplier, Class<? extends T> clazz)
+        {
+            super(parent, path, defaultSupplier, clazz);
+        }
+
+        private ValueBuilder<T> range(Range<T> range)
+        {
+            this.range = range;
+            return this;
+        }
+        
+        @SuppressWarnings("unchecked")
+        public ValueBuilder<T> range(T min, T max)
+        {
+            if (min.compareTo(max) > 0)
+                throw new IllegalArgumentException("Range min most be less then max.");
+            return range(new Range<T>((Class<T>) clazz, min, max));
+        }
+
+        @Override
+        void ensureEmpty()
+        {
+            super.ensureEmpty();
+            validate(range, "Non-null range when null expected");
         }
     }
 
@@ -479,20 +503,24 @@ public class ForgeConfigSpec extends UnmodifiableConfigWrapper<Config>
         private final Class<?> clazz;
         private final Supplier<?> supplier;
         private final Predicate<Object> validator;
+        private final UnaryOperator<Object> corrector;
         private Object _default = null;
 
-        private ValueSpec(Supplier<?> supplier, Predicate<Object> validator, BuilderContext context)
+        @SuppressWarnings("unchecked")
+        private ValueSpec(ValueBuilder<?> context)
         {
-            Objects.requireNonNull(supplier, "Default supplier can not be null");
-            Objects.requireNonNull(validator, "Validator can not be null");
+            Objects.requireNonNull(context.supplier, "Default supplier can not be null");
+            Objects.requireNonNull(context.validator, "Validator can not be null");
+            Objects.requireNonNull(context.corrector, "Corrector can not be null");
 
-            this.comment = LINE_JOINER.join(context.getComment());
-            this.langKey = context.getTranslationKey();
+            this.comment = context.comment == null ? null : LINE_JOINER.join(context.comment);
+            this.langKey = context.langKey;
             this.range = context.getRange();
-            this.worldRestart = context.needsWorldRestart();
-            this.clazz = context.getClazz();
-            this.supplier = supplier;
-            this.validator = validator;
+            this.worldRestart = context.worldRestart;
+            this.clazz = context.clazz;
+            this.supplier = context.supplier;
+            this.validator = (Predicate<Object>) context.validator;
+            this.corrector = (UnaryOperator<Object>) context.corrector;
         }
 
         public String getComment() { return comment; }
@@ -502,6 +530,7 @@ public class ForgeConfigSpec extends UnmodifiableConfigWrapper<Config>
         public boolean needsWorldRestart() { return this.worldRestart; }
         public Class<?> getClazz(){ return this.clazz; }
         public boolean test(Object value) { return validator.test(value); }
+        public Object correct(Object value) { return corrector.apply(value); }
 
         public Object getDefault()
         {
