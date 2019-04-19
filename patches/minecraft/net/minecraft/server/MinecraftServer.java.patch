@@ -1,6 +1,14 @@
 --- a/net/minecraft/server/MinecraftServer.java
 +++ b/net/minecraft/server/MinecraftServer.java
-@@ -335,20 +335,19 @@
+@@ -137,6 +137,7 @@
+    private String field_71320_r;
+    private int field_71319_s = -1;
+    private final Map<DimensionType, WorldServer> field_71305_c = Maps.newIdentityHashMap();
++   private final List<WorldServer> allWorldsTicksafe = Lists.newCopyOnWriteArrayList(); // Forge: A copy of the values of the worlds map, for use during tick iteration for CME safety
+    private PlayerList field_71318_t;
+    private boolean field_71317_u = true;
+    private boolean field_71316_v;
+@@ -335,20 +336,19 @@
           worldserver.func_72912_H().func_76060_a(this.func_71265_f());
        }
  
@@ -32,7 +40,7 @@
        this.func_184103_al().func_212504_a(worldserver);
        if (p_212369_3_.func_201357_P() != null) {
           this.func_201300_aS().func_201381_a(p_212369_3_.func_201357_P());
-@@ -514,6 +513,7 @@
+@@ -514,6 +514,7 @@
  
        for(WorldServer worldserver1 : this.func_212370_w()) {
           if (worldserver1 != null) {
@@ -40,7 +48,7 @@
              worldserver1.close();
           }
        }
-@@ -547,6 +547,7 @@
+@@ -547,6 +548,7 @@
     public void run() {
        try {
           if (this.func_71197_b()) {
@@ -48,7 +56,7 @@
              this.field_211151_aa = Util.func_211177_b();
              this.field_147147_p.func_151315_a(new TextComponentString(this.field_71286_C));
              this.field_147147_p.func_151321_a(new ServerStatusResponse.Version("1.13.2", 404));
-@@ -570,7 +571,10 @@
+@@ -570,7 +572,10 @@
  
                 this.field_71296_Q = true;
              }
@@ -59,7 +67,7 @@
              this.func_71228_a((CrashReport)null);
           }
        } catch (Throwable throwable1) {
-@@ -589,6 +593,7 @@
+@@ -589,6 +594,7 @@
              field_147145_h.error("We were unable to save this crash report to disk.");
           }
  
@@ -67,7 +75,7 @@
           this.func_71228_a(crashreport);
        } finally {
           try {
-@@ -597,6 +602,7 @@
+@@ -597,6 +603,7 @@
           } catch (Throwable throwable) {
              field_147145_h.error("Exception stopping the server", throwable);
           } finally {
@@ -75,7 +83,7 @@
              this.func_71240_o();
           }
  
-@@ -652,6 +658,7 @@
+@@ -652,6 +659,7 @@
  
     public void func_71217_p(BooleanSupplier p_71217_1_) {
        long i = Util.func_211178_c();
@@ -83,7 +91,7 @@
        ++this.field_71315_w;
        if (this.field_71295_T) {
           this.field_71295_T = false;
-@@ -672,6 +679,7 @@
+@@ -672,6 +680,7 @@
  
           Collections.shuffle(Arrays.asList(agameprofile));
           this.field_147147_p.func_151318_b().func_151330_a(agameprofile);
@@ -91,7 +99,7 @@
        }
  
        if (this.field_71315_w % 900 == 0) {
-@@ -696,6 +704,7 @@
+@@ -696,6 +705,7 @@
        this.field_211152_ao = this.field_211152_ao * 0.8F + (float)l / 1000000.0F * 0.19999999F;
        this.field_71304_b.func_76319_b();
        this.field_71304_b.func_76319_b();
@@ -99,7 +107,16 @@
     }
  
     public void func_71190_q(BooleanSupplier p_71190_1_) {
-@@ -723,6 +732,7 @@
+@@ -710,7 +720,7 @@
+       this.func_193030_aL().func_73660_a();
+       this.field_71304_b.func_76318_c("levels");
+ 
+-      for(WorldServer worldserver : this.func_212370_w()) {
++      for(WorldServer worldserver : allWorldsTicksafe) { // Forge: prevent CMEs caused by mods hotloading dimensions during tick
+          long i = Util.func_211178_c();
+          if (worldserver.field_73011_w.func_186058_p() == DimensionType.OVERWORLD || this.func_71255_r()) {
+             this.field_71304_b.func_194340_a(() -> {
+@@ -723,6 +733,7 @@
              }
  
              this.field_71304_b.func_76320_a("tick");
@@ -107,7 +124,7 @@
  
              try {
                 worldserver.func_72835_b(p_71190_1_);
-@@ -740,6 +750,7 @@
+@@ -740,6 +751,7 @@
                 throw new ReportedException(crashreport1);
              }
  
@@ -115,7 +132,7 @@
              this.field_71304_b.func_76319_b();
              this.field_71304_b.func_76320_a("tracker");
              worldserver.func_73039_n().func_72788_a();
-@@ -752,6 +763,8 @@
+@@ -752,6 +764,8 @@
           }))[this.field_71315_w % 100] = Util.func_211178_c() - i;
        }
  
@@ -124,7 +141,7 @@
        this.field_71304_b.func_76318_c("connection");
        this.func_147137_ag().func_151269_c();
        this.field_71304_b.func_76318_c("players");
-@@ -774,6 +787,14 @@
+@@ -774,6 +788,14 @@
     }
  
     public static void main(String[] p_main_0_) {
@@ -139,7 +156,7 @@
        Bootstrap.func_151354_b();
  
        try {
-@@ -876,7 +897,7 @@
+@@ -876,7 +898,7 @@
     }
  
     public void func_71256_s() {
@@ -148,7 +165,7 @@
        this.field_175590_aa.setUncaughtExceptionHandler((p_195574_0_, p_195574_1_) -> {
           field_147145_h.error(p_195574_1_);
        });
-@@ -896,7 +917,7 @@
+@@ -896,7 +918,7 @@
     }
  
     public WorldServer func_71218_a(DimensionType p_71218_1_) {
@@ -157,7 +174,7 @@
     }
  
     public Iterable<WorldServer> func_212370_w() {
-@@ -935,7 +956,7 @@
+@@ -935,7 +957,7 @@
     }
  
     public String getServerModName() {
@@ -166,7 +183,7 @@
     }
  
     public CrashReport func_71230_b(CrashReport p_71230_1_) {
-@@ -1472,4 +1493,14 @@
+@@ -1472,4 +1494,43 @@
           return 0;
        }
     }
@@ -175,9 +192,38 @@
 +   public long[] getTickTime(DimensionType dim) {
 +      return field_71312_k.get(dim);
 +   }
++   
++   /* ================== FORGE START ================== */ 
 +
-+   @Deprecated //Forge Internal use Only, You can screw up a lot of things if you mess with this map.
-+   public synchronized Map<DimensionType, WorldServer> forgeGetWorldMap() {
-+      return this.field_71305_c;
++   /** 
++    * Forge Internal use Only, You can screw up a lot of things if you mess with this map. 
++    * @deprecated Use {@link net.minecraftforge.common.DimensionManager#getWorld} 
++    */
++   @Deprecated
++   public Map<DimensionType, WorldServer> forgeGetWorldMap() {
++      return Collections.unmodifiableMap(this.field_71305_c); // sanity check that we DO NOT mutate this map. Below methods should be used.
++   }
++
++   /** 
++    * Forge Internal use Only, You can screw up a lot of things if you mess with this map. 
++    * @deprecated Do not call.
++    */
++   @Deprecated
++   public synchronized WorldServer forgeAddWorld(DimensionType type, WorldServer world) {
++      this.allWorldsTicksafe.add(world);
++      return this.field_71305_c.put(type, world);
++   }
++
++   /** 
++    * Forge Internal use Only, You can screw up a lot of things if you mess with this map. 
++    * @deprecated Do not call.
++    */
++   @Deprecated
++   public synchronized WorldServer forgeRemoveWorld(DimensionType type) {
++      WorldServer removed = this.field_71305_c.remove(type);
++      if (removed != null) {
++         this.allWorldsTicksafe.remove(removed);
++      }
++      return removed;
 +   }
  }

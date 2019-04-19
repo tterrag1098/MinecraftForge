@@ -205,7 +205,7 @@ public class DimensionManager
         world.addEventListener(new ServerWorldEventHandler(server, world));
         if (!server.isSinglePlayer())
             world.getWorldInfo().setGameType(server.getGameType());
-        server.forgeGetWorldMap().put(dim, world);
+        server.forgeAddWorld(dim, world);
 
         MinecraftForge.EVENT_BUS.post(new WorldEvent.Load(world));
 
@@ -282,7 +282,7 @@ public class DimensionManager
             {
                 MinecraftForge.EVENT_BUS.post(new WorldEvent.Unload(w));
                 w.close();
-                server.forgeGetWorldMap().remove(dim);
+                server.forgeRemoveWorld(dim);
             }
         }
 
