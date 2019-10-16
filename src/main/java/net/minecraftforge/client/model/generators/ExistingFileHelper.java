@@ -2,9 +2,8 @@ package net.minecraftforge.client.model.generators;
 
 import com.google.common.base.Preconditions;
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableMap;
-import net.minecraft.data.DataGenerator;
 import net.minecraft.resources.ResourcePackType;
+import net.minecraft.resources.VanillaPack;
 import net.minecraft.util.ResourceLocation;
 
 import java.io.IOException;
@@ -16,9 +15,11 @@ import java.util.function.Function;
 public class ExistingFileHelper {
     private final List<Function<Path, Path>> resolve;
     private final boolean enable;
+    private final VanillaPack vanillaResources;
 
     public ExistingFileHelper(Collection<Path> inputs, boolean enable) {
         this.enable = enable;
+        this.vanillaResources = new VanillaPack("minecraft");
         ImmutableList.Builder<Function<Path, Path>> resolve = ImmutableList.builder();
         for (Path base:inputs) {
             if (Files.isRegularFile(base)) {
@@ -38,6 +39,10 @@ public class ExistingFileHelper {
 
     public boolean exists(ResourceLocation loc, ResourcePackType type, String pathSuffix, String pathPrefix) {
         if (!enable) {
+            return true;
+        }
+        ResourceLocation fullLoc = new ResourceLocation(loc.getNamespace(), pathPrefix+"/"+loc.getPath()+pathSuffix);
+        if (vanillaResources.resourceExists(type, fullLoc)) {
             return true;
         }
         Path subPath = Paths.get(type.getDirectoryName(), loc.getNamespace(), pathPrefix, loc.getPath()+pathSuffix);
