@@ -56,6 +56,7 @@ import net.minecraft.block.StairsBlock;
 import net.minecraft.block.TrapDoorBlock;
 import net.minecraft.block.WallBlock;
 import net.minecraft.data.DataGenerator;
+import net.minecraft.data.DirectoryCache;
 import net.minecraft.data.IDataProvider;
 import net.minecraft.state.properties.AttachFace;
 import net.minecraft.state.properties.BlockStateProperties;
@@ -72,24 +73,41 @@ import net.minecraft.util.ResourceLocation;
  * Data provider for blockstate files. Extends {@link BlockModelProvider} so that
  * blockstates and their referenced models can be provided in tandem.
  */
-public abstract class BlockStateProvider extends BlockModelProvider {
+public abstract class BlockStateProvider implements IDataProvider {
 
     private static final Logger LOGGER = LogManager.getLogger();
     private static final Gson GSON = (new GsonBuilder()).setPrettyPrinting().disableHtmlEscaping().create();
 
     @VisibleForTesting
     protected final Map<Block, IGeneratedBlockstate> registeredBlocks = new LinkedHashMap<>();
+    
+    private final DataGenerator generator;
+    private final String modid;
+    private final BlockModelProvider blockModels;
 
     public BlockStateProvider(DataGenerator gen, String modid, ExistingFileHelper exFileHelper) {
-        super(gen, modid, exFileHelper);
+        this.generator = gen;
+        this.modid = modid;
+        this.blockModels = new BlockModelProvider(gen, modid, exFileHelper) {
+
+            @Override
+            public String getName() {
+                return BlockStateProvider.this.getName();
+            }
+            
+            @Override
+            protected void registerModels() {}
+        };
     }
 
     @Override
-    protected final void registerModels() {
+    public void act(DirectoryCache cache) throws IOException {
+        models().clear();
         registeredBlocks.clear();
         registerStatesAndModels();
+        models().generateAll(cache);
         for (Map.Entry<Block, IGeneratedBlockstate> entry : registeredBlocks.entrySet()) {
-            saveBlockState(entry.getValue().toJson(), entry.getKey());
+            saveBlockState(cache, entry.getValue().toJson(), entry.getKey());
         }
     }
 
@@ -118,6 +136,18 @@ public abstract class BlockStateProvider extends BlockModelProvider {
             return ret;
         }
     }
+    
+    protected BlockModelProvider models() {
+        return blockModels;
+    }
+    
+    public ResourceLocation modLoc(String name) {
+        return new ResourceLocation(modid, name);
+    }
+
+    public ResourceLocation mcLoc(String name) {
+        return new ResourceLocation(name);
+    }
 
     private String name(Block block) {
         return block.getRegistryName().getPath();
@@ -125,7 +155,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
 
     protected ResourceLocation blockTexture(Block block) {
         ResourceLocation name = block.getRegistryName();
-        return new ResourceLocation(name.getNamespace(), BLOCK_FOLDER + "/" + name.getPath());
+        return new ResourceLocation(name.getNamespace(), ModelProvider.BLOCK_FOLDER + "/" + name.getPath());
     }
 
     private ResourceLocation extend(ResourceLocation rl, String suffix) {
@@ -133,7 +163,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     protected ModelFile cubeAll(Block block) {
-        return cubeAll(name(block), blockTexture(block));
+        return models().cubeAll(name(block), blockTexture(block));
     }
 
     protected void simpleBlock(Block block) {
@@ -166,7 +196,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     protected void axisBlock(RotatedPillarBlock block, ResourceLocation side, ResourceLocation end) {
-        axisBlock(block, cubeColumn(name(block), side, end));
+        axisBlock(block, models().cubeColumn(name(block), side, end));
     }
 
     protected void axisBlock(RotatedPillarBlock block, ModelFile model) {
@@ -182,7 +212,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     private static final int DEFAULT_ANGLE_OFFSET = 180;
 
     protected void horizontalBlock(Block block, ResourceLocation side, ResourceLocation front, ResourceLocation top) {
-        horizontalBlock(block, orientable(name(block), side, front, top));
+        horizontalBlock(block, models().orientable(name(block), side, front, top));
     }
 
     protected void horizontalBlock(Block block, ModelFile model) {
@@ -269,9 +299,9 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     private void stairsBlockInternal(StairsBlock block, String baseName, ResourceLocation side, ResourceLocation bottom, ResourceLocation top) {
-        ModelFile stairs = stairs(baseName, side, bottom, top);
-        ModelFile stairsInner = stairsInner(baseName + "_inner", side, bottom, top);
-        ModelFile stairsOuter = stairsOuter(baseName + "_outer", side, bottom, top);
+        ModelFile stairs = models().stairs(baseName, side, bottom, top);
+        ModelFile stairsInner = models().stairsInner(baseName + "_inner", side, bottom, top);
+        ModelFile stairsOuter = models().stairsOuter(baseName + "_outer", side, bottom, top);
         stairsBlock(block, stairs, stairsInner, stairsOuter);
     }
 
@@ -304,7 +334,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     protected void slabBlock(SlabBlock block, ResourceLocation doubleslab, ResourceLocation side, ResourceLocation bottom, ResourceLocation top) {
-        slabBlock(block, slab(name(block), side, bottom, top), slabTop(name(block) + "_top", side, bottom, top), getExistingFile(doubleslab));
+        slabBlock(block, models().slab(name(block), side, bottom, top), models().slabTop(name(block) + "_top", side, bottom, top), models().getExistingFile(doubleslab));
     }
 
     protected void slabBlock(SlabBlock block, ModelFile bottom, ModelFile top, ModelFile doubleslab) {
@@ -332,11 +362,11 @@ public abstract class BlockStateProvider extends BlockModelProvider {
 
     protected void fenceBlock(FenceBlock block, ResourceLocation texture) {
         String baseName = block.getRegistryName().toString();
-        fourWayBlock(block, fencePost(baseName + "_post", texture), fenceSide(baseName + "_side", texture));
+        fourWayBlock(block, models().fencePost(baseName + "_post", texture), models().fenceSide(baseName + "_side", texture));
     }
 
     protected void fenceBlock(FenceBlock block, String name, ResourceLocation texture) {
-        fourWayBlock(block, fencePost(name + "_fence_post", texture), fenceSide(name + "_fence_side", texture));
+        fourWayBlock(block, models().fencePost(name + "_fence_post", texture), models().fenceSide(name + "_fence_side", texture));
     }
 
     protected void fenceGateBlock(FenceGateBlock block, ResourceLocation texture) {
@@ -348,10 +378,10 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     private void fenceGateBlockInternal(FenceGateBlock block, String baseName, ResourceLocation texture) {
-        ModelFile gate = fenceGate(baseName, texture);
-        ModelFile gateOpen = fenceGateOpen(baseName + "_open", texture);
-        ModelFile gateWall = fenceGateWall(baseName + "_wall", texture);
-        ModelFile gateWallOpen = fenceGateWallOpen(baseName + "_wall_open", texture);
+        ModelFile gate = models().fenceGate(baseName, texture);
+        ModelFile gateOpen = models().fenceGateOpen(baseName + "_open", texture);
+        ModelFile gateWall = models().fenceGateWall(baseName + "_wall", texture);
+        ModelFile gateWallOpen = models().fenceGateWallOpen(baseName + "_wall_open", texture);
         fenceGateBlock(block, gate, gateOpen, gateWall, gateWallOpen);
     }
 
@@ -381,7 +411,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     private void wallBlockInternal(WallBlock block, String baseName, ResourceLocation texture) {
-        wallBlock(block, wallPost(baseName + "_post", texture), wallSide(baseName + "_side", texture));
+        wallBlock(block, models().wallPost(baseName + "_post", texture), models().wallSide(baseName + "_side", texture));
     }
 
     protected void wallBlock(WallBlock block, ModelFile post, ModelFile side) {
@@ -400,11 +430,11 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     private void paneBlockInternal(PaneBlock block, String baseName, ResourceLocation pane, ResourceLocation edge) {
-        ModelFile post = panePost(baseName + "_post", pane, edge);
-        ModelFile side = paneSide(baseName + "_side", pane, edge);
-        ModelFile sideAlt = paneSideAlt(baseName + "_side_alt", pane, edge);
-        ModelFile noSide = paneNoSide(baseName + "_noside", pane);
-        ModelFile noSideAlt = paneNoSideAlt(baseName + "_noside_alt", pane);
+        ModelFile post = models().panePost(baseName + "_post", pane, edge);
+        ModelFile side = models().paneSide(baseName + "_side", pane, edge);
+        ModelFile sideAlt = models().paneSideAlt(baseName + "_side_alt", pane, edge);
+        ModelFile noSide = models().paneNoSide(baseName + "_noside", pane);
+        ModelFile noSideAlt = models().paneNoSideAlt(baseName + "_noside_alt", pane);
         paneBlock(block, post, side, sideAlt, noSide, noSideAlt);
     }
 
@@ -432,10 +462,10 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     private void doorBlockInternal(DoorBlock block, String baseName, ResourceLocation bottom, ResourceLocation top) {
-        ModelFile bottomLeft = doorBottomLeft(baseName + "_bottom", bottom, top);
-        ModelFile bottomRight = doorBottomRight(baseName + "_bottom_hinge", bottom, top);
-        ModelFile topLeft = doorTopLeft(baseName + "_top", bottom, top);
-        ModelFile topRight = doorTopRight(baseName + "_top_hinge", bottom, top);
+        ModelFile bottomLeft = models().doorBottomLeft(baseName + "_bottom", bottom, top);
+        ModelFile bottomRight = models().doorBottomRight(baseName + "_bottom_hinge", bottom, top);
+        ModelFile topLeft = models().doorTopLeft(baseName + "_top", bottom, top);
+        ModelFile topRight = models().doorTopRight(baseName + "_top_hinge", bottom, top);
         doorBlock(block, bottomLeft, bottomRight, topLeft, topRight);
     }
 
@@ -467,9 +497,9 @@ public abstract class BlockStateProvider extends BlockModelProvider {
     }
 
     private void trapdoorBlockInternal(TrapDoorBlock block, String baseName, ResourceLocation texture, boolean orientable) {
-        ModelFile bottom = orientable ? trapdoorOrientableBottom(baseName + "_bottom", texture) : trapdoorBottom(baseName + "_bottom", texture);
-        ModelFile top = orientable ? trapdoorOrientableTop(baseName + "_top", texture) : trapdoorTop(baseName + "_top", texture);
-        ModelFile open = orientable ? trapdoorOrientableOpen(baseName + "_open", texture) : trapdoorOpen(baseName + "_open", texture);
+        ModelFile bottom = orientable ? models().trapdoorOrientableBottom(baseName + "_bottom", texture) : models().trapdoorBottom(baseName + "_bottom", texture);
+        ModelFile top = orientable ? models().trapdoorOrientableTop(baseName + "_top", texture) : models().trapdoorTop(baseName + "_top", texture);
+        ModelFile open = orientable ? models().trapdoorOrientableOpen(baseName + "_open", texture) : models().trapdoorOpen(baseName + "_open", texture);
         trapdoorBlock(block, bottom, top, open, orientable);
     }
 
@@ -493,7 +523,7 @@ public abstract class BlockStateProvider extends BlockModelProvider {
         }, TrapDoorBlock.POWERED, TrapDoorBlock.WATERLOGGED);
     }
 
-    private void saveBlockState(JsonObject stateJson, Block owner) {
+    private void saveBlockState(DirectoryCache cache, JsonObject stateJson, Block owner) {
         ResourceLocation blockName = Preconditions.checkNotNull(owner.getRegistryName());
         Path mainOutput = generator.getOutputFolder();
         String pathSuffix = "assets/" + blockName.getNamespace() + "/blockstates/" + blockName.getPath() + ".json";
