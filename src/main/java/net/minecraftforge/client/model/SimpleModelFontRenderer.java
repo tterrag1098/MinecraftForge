@@ -19,23 +19,22 @@
 
 package net.minecraftforge.client.model;
 
-import net.minecraft.client.renderer.Matrix4f;
-import net.minecraft.client.renderer.TransformationMatrix;
-import net.minecraft.client.renderer.Vector3f;
-import net.minecraft.client.renderer.Vector4f;
-import net.minecraft.client.renderer.vertex.VertexFormatElement;
-import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
-
 import com.google.common.collect.ImmutableList;
 
 import net.minecraft.client.GameSettings;
 import net.minecraft.client.gui.FontRenderer;
+import net.minecraft.client.renderer.Matrix4f;
+import net.minecraft.client.renderer.TransformationMatrix;
+import net.minecraft.client.renderer.Vector3f;
+import net.minecraft.client.renderer.Vector4f;
 import net.minecraft.client.renderer.model.BakedQuad;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.client.renderer.texture.TextureManager;
 import net.minecraft.client.renderer.vertex.VertexFormat;
+import net.minecraft.client.renderer.vertex.VertexFormatElement;
 import net.minecraft.util.Direction;
 import net.minecraft.util.ResourceLocation;
+import net.minecraftforge.client.model.pipeline.BakedQuadBuilder;
 
 public abstract class SimpleModelFontRenderer extends FontRenderer {
 
@@ -70,7 +69,7 @@ public abstract class SimpleModelFontRenderer extends FontRenderer {
 
     private final Vector4f vec = new Vector4f();
 
-    private void addVertex(UnpackedBakedQuad.Builder quadBuilder, float x, float y, float u, float v)
+    private void addVertex(BakedQuadBuilder quadBuilder, float x, float y, float u, float v)
     {
         ImmutableList<VertexFormatElement> elements = format.func_227894_c_();
         for(int e = 0; e < elements.size(); e++)

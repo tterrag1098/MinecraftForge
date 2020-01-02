@@ -21,6 +21,8 @@ package net.minecraftforge.client.extensions;
 
 import com.mojang.blaze3d.matrix.MatrixStack;
 import com.mojang.blaze3d.vertex.IVertexBuilder;
+
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.Matrix4f;
 import net.minecraft.client.renderer.Vector3f;
 import net.minecraft.client.renderer.Vector4f;
@@ -102,10 +104,10 @@ public interface IForgeVertexBuilder
     }
     
     default int applyBakedLighting(int lightmapCoord, ByteBuffer data) {
-        int sl = (lightmapCoord >> 16) & 0xFFFF;
-        int bl = lightmapCoord & 0xFFFF;
-        sl = Math.max(sl, Short.toUnsignedInt(data.getShort(24)));
+        int bl = LightTexture.func_228450_a_(lightmapCoord);
+        int sl = LightTexture.func_228454_b_(lightmapCoord);
         bl = Math.max(bl, Short.toUnsignedInt(data.getShort(26)));
-        return (sl << 16) | bl;
+        sl = Math.max(sl, Short.toUnsignedInt(data.getShort(24)));
+        return LightTexture.func_228451_a_(bl, sl);
     }
 }

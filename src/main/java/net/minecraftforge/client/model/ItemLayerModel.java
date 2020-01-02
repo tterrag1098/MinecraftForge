@@ -31,9 +31,9 @@ import net.minecraft.client.renderer.vertex.VertexFormat;
 import net.minecraft.util.Direction;
 import net.minecraft.util.ResourceLocation;
 import net.minecraftforge.client.model.geometry.IModelGeometry;
+import net.minecraftforge.client.model.pipeline.BakedQuadBuilder;
 import net.minecraftforge.client.model.pipeline.IVertexConsumer;
 import net.minecraftforge.client.model.pipeline.TRSRTransformer;
-import net.minecraftforge.client.model.pipeline.UnpackedBakedQuad;
 
 import java.util.Arrays;
 import java.util.BitSet;
@@ -379,7 +379,7 @@ public final class ItemLayerModel implements IModelGeometry<ItemLayerModel>
         float x2, float y2, float z2, float u2, float v2,
         float x3, float y3, float z3, float u3, float v3)
     {
-        UnpackedBakedQuad.Builder builder = new UnpackedBakedQuad.Builder(format);
+        BakedQuadBuilder builder = new BakedQuadBuilder();
 
         builder.setQuadTint(tint);
         builder.setQuadOrientation(side);
