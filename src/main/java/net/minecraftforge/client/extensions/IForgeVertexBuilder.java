@@ -98,6 +98,7 @@ public interface IForgeVertexBuilder
                 float f10 = bytebuffer.getFloat(20);
                 Vector4f pos = new Vector4f(f, f1, f2, 1.0F);
                 pos.func_229372_a_(matrix4f);
+                applyBakedNormals(normal, bytebuffer);
                 ((IVertexBuilder)this).func_225588_a_(pos.getX(), pos.getY(), pos.getZ(), cr, cg, cb, ca, f9, f10, overlayCoords, lightmapCoord, normal.getX(), normal.getY(), normal.getZ());
             }
         }
@@ -109,5 +110,14 @@ public interface IForgeVertexBuilder
         bl = Math.max(bl, Short.toUnsignedInt(data.getShort(26)));
         sl = Math.max(sl, Short.toUnsignedInt(data.getShort(24)));
         return LightTexture.func_228451_a_(bl, sl);
+    }
+    
+    default void applyBakedNormals(Vector3f generated, ByteBuffer data) {
+        byte nx = data.get(28);
+        byte ny = data.get(29);
+        byte nz = data.get(30);
+        if (nx != 0 || ny != 0 || nz != 0) {
+            generated.set(nx / 127f, ny / 127f, nz / 127f);
+        }
     }
 }
