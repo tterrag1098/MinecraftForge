@@ -41,18 +41,16 @@ public abstract class SimpleModelFontRenderer extends FontRenderer {
     private float r, g, b, a;
     private final TransformationMatrix transform;
     private ImmutableList.Builder<BakedQuad> builder = ImmutableList.builder();
-    private final VertexFormat format;
     private final Vector3f normal = new Vector3f(0, 0, 1);
     private final Direction orientation;
     private boolean fillBlanks = false;
 
     private TextureAtlasSprite sprite;
 
-    public SimpleModelFontRenderer(GameSettings settings, ResourceLocation font, TextureManager manager, boolean isUnicode, Matrix4f matrix, VertexFormat format)
+    public SimpleModelFontRenderer(GameSettings settings, ResourceLocation font, TextureManager manager, boolean isUnicode, Matrix4f matrix)
     {
         super(manager, null);
         this.transform = new TransformationMatrix(matrix);
-        this.format = format;
         transform.transformNormal(normal);
         orientation = Direction.getFacingFromVector(normal.getX(), normal.getY(), normal.getZ());
     }
@@ -71,7 +69,7 @@ public abstract class SimpleModelFontRenderer extends FontRenderer {
 
     private void addVertex(BakedQuadBuilder quadBuilder, float x, float y, float u, float v)
     {
-        ImmutableList<VertexFormatElement> elements = format.func_227894_c_();
+        ImmutableList<VertexFormatElement> elements = quadBuilder.getVertexFormat().func_227894_c_();
         for(int e = 0; e < elements.size(); e++)
         {
             VertexFormatElement element = elements.get(e);

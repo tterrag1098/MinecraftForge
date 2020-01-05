@@ -178,7 +178,7 @@ public final class ModelDynBucket implements IModelGeometry<ModelDynBucket>
         if (baseLocation != null)
         {
             // build base (insidest)
-            builder.addAll(ItemLayerModel.getQuadsForSprites(ImmutableList.of(baseLocation), DefaultVertexFormats.BLOCK, transform, spriteGetter));
+            builder.addAll(ItemLayerModel.getQuadsForSprites(ImmutableList.of(baseLocation), transform, spriteGetter));
         }
 
         if (fluidMaskLocation != null && fluidSprite != null)
@@ -216,7 +216,7 @@ public final class ModelDynBucket implements IModelGeometry<ModelDynBucket>
             }
         }
 
-        return new BakedDynBucket(bakery, owner, this, builder.build(), particleSprite, DefaultVertexFormats.BLOCK, Maps.immutableEnumMap(transformMap), Maps.newHashMap(), transform.isIdentity(), modelTransform);
+        return new BakedDynBucket(bakery, owner, this, builder.build(), particleSprite, Maps.immutableEnumMap(transformMap), Maps.newHashMap(), transform.isIdentity(), modelTransform);
     }
 
     @Override
@@ -434,14 +434,12 @@ public final class ModelDynBucket implements IModelGeometry<ModelDynBucket>
         private final IModelConfiguration owner;
         private final ModelDynBucket parent;
         private final Map<String, IBakedModel> cache; // contains all the baked models since they'll never change
-        private final VertexFormat format;
         private final IModelTransform originalTransform;
 
         BakedDynBucket(ModelBakery bakery,
                        IModelConfiguration owner, ModelDynBucket parent,
                        ImmutableList<BakedQuad> quads,
                        TextureAtlasSprite particle,
-                       VertexFormat format,
                        ImmutableMap<TransformType, TransformationMatrix> transforms,
                        Map<String, IBakedModel> cache,
                        boolean untransformed,
@@ -449,7 +447,6 @@ public final class ModelDynBucket implements IModelGeometry<ModelDynBucket>
         {
             super(quads, particle, transforms, new BakedDynBucketOverrideHandler(bakery), untransformed);
             this.owner = owner;
-            this.format = format;
             this.parent = parent;
             this.cache = cache;
             this.originalTransform = originalTransform;
