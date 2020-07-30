@@ -77,12 +77,12 @@ public class CompositeModel implements IDynamicBakedModel
 
     @Nonnull
     @Override
-    public IModelData getModelData(@Nonnull IBlockDisplayReader world, @Nonnull BlockPos pos, @Nonnull BlockState state, @Nonnull IModelData tileData)
+    public IModelData getModelData(@Nonnull IBlockDisplayReader world, @Nonnull BlockPos pos, @Nonnull BlockState state, @Nonnull Random rand, @Nonnull IModelData tileData)
     {
         CompositeModelData composite = new CompositeModelData();
         for(Map.Entry<String, IBakedModel> entry : bakedParts.entrySet())
         {
-            composite.putSubmodelData(entry.getKey(), entry.getValue().getModelData(world, pos, state, ModelDataWrapper.wrap(tileData)));
+            composite.putSubmodelData(entry.getKey(), entry.getValue().getModelData(world, pos, state, rand, ModelDataWrapper.wrap(tileData)));
         }
         return composite;
     }

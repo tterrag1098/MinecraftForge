@@ -71,7 +71,13 @@ public interface IForgeBakedModel
         return net.minecraftforge.client.ForgeHooksClient.handlePerspective(getBakedModel(), cameraTransformType, mat);
     }
 
+    @Deprecated
     default @Nonnull IModelData getModelData(@Nonnull IBlockDisplayReader world, @Nonnull BlockPos pos, @Nonnull BlockState state, @Nonnull IModelData tileData)
+    {
+    	return getModelData(world, pos, state, new Random(), tileData);
+    }
+
+    default @Nonnull IModelData getModelData(@Nonnull IBlockDisplayReader world, @Nonnull BlockPos pos, @Nonnull BlockState state, @Nonnull Random rand, @Nonnull IModelData tileData)
     {
         return tileData;
     }
