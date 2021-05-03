@@ -55,7 +55,6 @@ import net.minecraftforge.client.model.ModelLoaderRegistry;
 import net.minecraftforge.common.ForgeConfig;
 import net.minecraftforge.common.MinecraftForge;
 import net.minecraftforge.fml.client.gui.screen.LoadingErrorScreen;
-import net.minecraftforge.fml.client.registry.RenderingRegistry;
 import net.minecraftforge.fml.loading.moddiscovery.ModFile;
 import net.minecraftforge.fml.packs.DelegatingResourcePack;
 import net.minecraftforge.fml.packs.ModFileResourcePack;
@@ -129,16 +128,7 @@ public class ClientModLoader
 
     private static void startModLoading(ModWorkManager.DrivenExecutor syncExecutor, Executor parallelExecutor) {
         earlyLoaderGUI.handleElsewhere();
-        createRunnableWithCatch(() -> ModLoader.get().loadMods(syncExecutor, parallelExecutor, executor -> CompletableFuture.runAsync(ClientModLoader::preSidedRunnable, executor), executor -> CompletableFuture.runAsync(ClientModLoader::postSidedRunnable, executor), new SpacedRunnable(earlyLoaderGUI::renderTick))).run();
-    }
-
-    private static void postSidedRunnable() {
-        LOGGER.debug(LOADING, "Running post client event work");
-        RenderingRegistry.loadEntityRenderers(mc.getEntityRenderDispatcher());
-    }
-
-    private static void preSidedRunnable() {
-        LOGGER.debug(LOADING, "Running pre client event work");
+        createRunnableWithCatch(() -> ModLoader.get().loadMods(syncExecutor, parallelExecutor, new SpacedRunnable(earlyLoaderGUI::renderTick))).run();
     }
 
     private static void finishModLoading(ModWorkManager.DrivenExecutor syncExecutor, Executor parallelExecutor)

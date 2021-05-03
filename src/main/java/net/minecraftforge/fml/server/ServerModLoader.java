@@ -42,7 +42,7 @@ public class ServerModLoader
         LanguageHook.loadForgeAndMCLangs();
         try {
             ModLoader.get().gatherAndInitializeMods(ModWorkManager.syncExecutor(), ModWorkManager.parallelExecutor(), ()->{});
-            ModLoader.get().loadMods(ModWorkManager.syncExecutor(), ModWorkManager.parallelExecutor(), e-> CompletableFuture.runAsync(()->{}, e), e->CompletableFuture.runAsync(()->{}, e), ()->{});
+            ModLoader.get().loadMods(ModWorkManager.syncExecutor(), ModWorkManager.parallelExecutor(), ()->{});
             ModLoader.get().finishMods(ModWorkManager.syncExecutor(), ModWorkManager.parallelExecutor(), ()->{});
         } catch (LoadingFailedException error) {
             ServerModLoader.hasErrors = true;

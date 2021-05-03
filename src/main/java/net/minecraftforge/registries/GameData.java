@@ -366,17 +366,18 @@ public class GameData
     }
 
     public static CompletableFuture<List<Throwable>> preRegistryEventDispatch(final Executor executor, final ModLoadingStage.EventGenerator<? extends RegistryEvent.Register<?>> eventGenerator) {
-        return CompletableFuture.runAsync(()-> {
+        return CompletableFuture.supplyAsync(()-> {
                     final RegistryEvent.Register<?> event = eventGenerator.apply(null);
                     final ResourceLocation rl = event.getName();
                     ForgeRegistry<?> fr = (ForgeRegistry<?>) event.getRegistry();
                     StartupMessageManager.modLoaderConsumer().ifPresent(s -> s.accept("REGISTERING " + rl));
                     fr.unfreeze();
-                }, executor).thenApply(v->Collections.emptyList());
+                    return Collections.emptyList();
+                }, executor);
     }
 
     public static CompletableFuture<List<Throwable>> postRegistryEventDispatch(final Executor executor, final ModLoadingStage.EventGenerator<? extends RegistryEvent.Register<?>> eventGenerator) {
-        return CompletableFuture.runAsync(()-> {
+        return CompletableFuture.supplyAsync(()-> {
             final RegistryEvent.Register<?> event = eventGenerator.apply(null);
             final ResourceLocation rl = event.getName();
             ForgeRegistry<?> fr = (ForgeRegistry<?>) event.getRegistry();
@@ -384,7 +385,8 @@ public class GameData
             LOGGER.debug(REGISTRIES, "Applying holder lookups: {}", rl.toString());
             ObjectHolderRegistry.applyObjectHolders(rl::equals);
             LOGGER.debug(REGISTRIES, "Holder lookups applied: {}", rl.toString());
-        }, executor).handle((v, t)->t != null ? Collections.singletonList(t): Collections.emptyList());
+            return Collections.emptyList();
+        }, executor);
     }
 
     @SuppressWarnings("deprecation")

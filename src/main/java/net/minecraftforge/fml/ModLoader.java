@@ -33,7 +33,6 @@ import net.minecraftforge.fml.loading.LoadingModList;
 import net.minecraftforge.fml.loading.moddiscovery.InvalidModIdentifier;
 import net.minecraftforge.fml.loading.moddiscovery.ModFile;
 import net.minecraftforge.fml.loading.moddiscovery.ModFileInfo;
-import net.minecraftforge.fml.loading.moddiscovery.ModInfo;
 import net.minecraftforge.fml.loading.progress.StartupMessageManager;
 import net.minecraftforge.fml.network.FMLNetworkConstants;
 import net.minecraftforge.fml.network.NetworkRegistry;
@@ -197,14 +196,19 @@ public class ModLoader
         statusConsumer.ifPresent(c->c.accept("Early mod loading complete"));
     }
 
+    @Deprecated // TODO Remove in 1.17
     public void loadMods(final ModWorkManager.DrivenExecutor syncExecutor, final Executor parallelExecutor, final Function<Executor, CompletableFuture<Void>> beforeSidedEvent, final Function<Executor, CompletableFuture<Void>> afterSidedEvent, final Runnable periodicTask) {
+        loadMods(syncExecutor, parallelExecutor, periodicTask);
+    }
+    
+    public void loadMods(final ModWorkManager.DrivenExecutor syncExecutor, final Executor parallelExecutor, final Runnable periodicTask) {
         statusConsumer.ifPresent(c->c.accept("Loading mod config"));
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT, ()->()-> ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.CLIENT, FMLPaths.CONFIGDIR.get()));
         ConfigTracker.INSTANCE.loadConfigs(ModConfig.Type.COMMON, FMLPaths.CONFIGDIR.get());
         statusConsumer.ifPresent(c->c.accept("Mod setup: SETUP"));
         dispatchAndHandleError(ModLoadingStage.COMMON_SETUP, syncExecutor, parallelExecutor, periodicTask);
         statusConsumer.ifPresent(c->c.accept("Mod setup: SIDED SETUP"));
-        dispatchAndHandleError(ModLoadingStage.SIDED_SETUP, syncExecutor, parallelExecutor, periodicTask, beforeSidedEvent, afterSidedEvent);
+        dispatchAndHandleError(ModLoadingStage.SIDED_SETUP, syncExecutor, parallelExecutor, periodicTask);
         statusConsumer.ifPresent(c->c.accept("Mod setup complete"));
     }
 
@@ -230,14 +234,6 @@ public class ModLoader
         waitForTransition(state, syncExecutor, ticker, state.buildTransition(syncExecutor, parallelExecutor));
     }
 
-    private void dispatchAndHandleError(ModLoadingStage state, ModWorkManager.DrivenExecutor syncExecutor, Executor parallelExecutor, final Runnable ticker, Function<Executor, CompletableFuture<Void>> preSyncTask, Function<Executor, CompletableFuture<Void>> postSyncTask) {
-        if (!isLoadingStateValid()) {
-            LOGGER.error("Cowardly refusing to process mod state change request from {}", state);
-            return;
-        }
-        waitForTransition(state, syncExecutor, ticker, state.buildTransition(syncExecutor, parallelExecutor, preSyncTask, postSyncTask));
-    }
-
     private void waitForTransition(final ModLoadingStage state, final ModWorkManager.DrivenExecutor syncExecutor, final Runnable ticker, final CompletableFuture<List<Throwable>> transition) {
         while (!transition.isDone()) {
             syncExecutor.drive(ticker);
@@ -251,8 +247,9 @@ public class ModLoader
                     .filter(obj -> !(obj instanceof ModLoadingException))
                     .collect(Collectors.toList());
             if (!notModLoading.isEmpty()) {
-                LOGGER.fatal("Encountered non-modloading exceptions!", e);
-                throw e;
+                RuntimeException e2 = new MultiException(notModLoading);
+                LOGGER.fatal("Encountered non-modloading exceptions!", e2);
+                throw e2;
             }
 
             final List<ModLoadingException> modLoadingExceptions = Arrays.stream(t.getSuppressed())

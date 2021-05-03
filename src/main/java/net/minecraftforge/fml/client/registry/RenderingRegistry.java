@@ -22,7 +22,7 @@ package net.minecraftforge.fml.client.registry;
 import java.util.Map;
 import java.util.concurrent.ConcurrentHashMap;
 
-import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.entity.EntityRendererManager;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.EntityType;
@@ -42,6 +42,11 @@ public class RenderingRegistry
     public static <T extends Entity> void registerEntityRenderingHandler(EntityType<T> entityClass, IRenderFactory<? super T> renderFactory)
     {
         INSTANCE.entityRenderers.put(entityClass, renderFactory);
+    }
+    
+    public static void loadEntityRenderers()
+    {
+    	loadEntityRenderers(Minecraft.getInstance().getEntityRenderDispatcher());
     }
 
     public static void loadEntityRenderers(EntityRendererManager manager)
